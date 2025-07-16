@@ -1,38 +1,33 @@
-from kivy.app import App
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.label import Label
-from kivy.clock import Clock
-import urllib.request
+name: Build APK
 
+on:
+  push:
+    branches: [ main ]
 
-class IPBox(BoxLayout):
-    def __init__(self, **kwargs):
-        super().__init__(orientation='vertical', padding=50, spacing=20, **kwargs)
-        self.ip_label = Label(text='IP wird geladen...', font_size=32, color=(1,1,1,1))
-        self.status_label = Label(text='', font_size=64)
-        self.add_widget(self.status_label)
-        self.add_widget(self.ip_label)
-        self.refresh_ip()
-        Clock.schedule_interval(lambda dt: self.refresh_ip(), 60)
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
 
-    def refresh_ip(self):
-        try:
-            with urllib.request.urlopen("https://www.uliana.de/IP", timeout=5) as response:
-                ip = response.read().decode().strip()
-                self.ip_label.text = ip
-                if ip == "37.221.193.70":
-                    self.status_label.text = "🔒"
-                    self.status_label.color = (0, 1, 0, 1)  # Grün
-                else:
-                    self.status_label.text = "🔓"
-                    self.status_label.color = (1, 0.3, 0.3, 1)  # Rot
-        except Exception as e:
-            self.ip_label.text = f"Fehler: {e}"
-            self.status_label.text = "❌"
-            self.status_label.color = (1, 1, 0, 1)  # Gelb
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip build-essential git zip unzip openjdk-11-jdk libncurses5
+          pip install --upgrade pip Cython virtualenv
+          pip install buildozer
 
-class VPNIPApp(App):
-    def build(self):
-        self.title = "VPN IP Checker"
-        return IPBox()
+      - name: Build APK
+        run: |
+          buildozer android debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VPN-IP-Checker
+          path: bin/*.apk
